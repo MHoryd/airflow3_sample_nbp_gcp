@@ -1,0 +1,22 @@
+services:
+  airflow:
+    container_name: airflow3-example
+    build: .
+
+    ports:
+      - "8080:8080"
+
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+
+      PYTHONPATH: /opt/airflow/src
+
+      GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/keys/gcp-key.json
+      config_bucket: ${config_bucket}
+
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./src:/opt/airflow/src
+      - ./keys:/opt/airflow/keys
+
+    command: airflow standalone

@@ -1,0 +1,21 @@
+[project]
+name = "airflow-kata"
+version = "0.1.0"
+description = "Kata project for airflow 3"
+readme = "README.md"
+requires-python = "==3.12.*"
+
+dependencies = [
+    "apache-airflow-providers-google>=21.2.0",
+    "defusedxml>=0.7.1",
+    "google-cloud-storage>=3.1.0",
+    "httpx>=0.28.1",
+    "pandas>=2.2.0",
+    "pendulum>=3.0.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

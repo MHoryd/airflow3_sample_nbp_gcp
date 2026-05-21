@@ -1,23 +1,24 @@
-import httpx
 import json
-from airflow_kata.plugins.google_bucket_handler import GoogleCloudStorageHandler
-import defusedxml.ElementTree as ET
-import pendulum
-import pandas as pd
 import logging
+from datetime import datetime
+
+import httpx
+import pandas as pd
+import pendulum
+from airflow.models.taskinstance import TaskInstance
+from airflow.sdk import get_current_context
+from defusedxml import ElementTree
+
+from airflow_kata.plugins.google_bucket_handler import GoogleCloudStorageHandler
 
 
 class NbpCurrencyRates:
-    """
-    Collection of ETL operations responsible for processing
-    NBP currency exchange rates data.
-    """
+    """Collection of ETL operations responsible for processing NBP currency exchange rates data."""
 
     @staticmethod
-    def get_rates_and_store_in_bronze(logical_date=None, **kwargs) -> bool:
+    def get_rates_and_store_in_bronze(logical_date: datetime) -> bool:
         """
-        Download NBP exchange rates XML file for Airflow logical date
-        and store raw payload in bronze layer.
+        Download NBP exchange rates XML file for Airflow logical date and store raw payload in bronze layer.
 
         The function uses NBP dir.txt index to resolve the correct
         historical XML file name.
@@ -28,12 +29,14 @@ class NbpCurrencyRates:
 
         Returns:
             True if data for requested date exists, otherwise False.
+
         """
         logger = logging.getLogger(__name__)
-        metadata = kwargs["metadata"]
-        nbp_url = metadata["nbp_url"]
+        context = get_current_context()
+        metadata = context["metadata"]
+        nbp_url = metadata.get("nbp_url")
         run_date = logical_date.strftime("%y%m%d")
-        logger.info(f"Processing data for logical date: {logical_date}")
+        logger.info("Processing data for logical date: %s", logical_date)
         request_for_rates_list = httpx.get(
             f"{nbp_url}dir.txt",
             timeout=metadata.get("request_timeout", 30),
@@ -45,7 +48,7 @@ class NbpCurrencyRates:
             None,
         )
         if target:
-            logger.info(f"Found target and making request for: {target}")
+            logger.info("Found target and making request for: %s", target)
             request_for_target_rates = httpx.get(
                 f"{nbp_url}{target}.xml",
                 timeout=metadata.get("request_timeout", 30),
@@ -60,15 +63,14 @@ class NbpCurrencyRates:
                 bucket_name=metadata["destination_bucket"],
                 content_type="application/xml; charset=utf-8",
             )
-            logger.info(f"Uploaded blob: {blob_path}")
+            logger.info("Uploaded blob: %s", blob_path)
             return True
         return False
 
     @staticmethod
-    def choose_branch(ti) -> str:
+    def choose_branch(ti: TaskInstance) -> str:
         """
-        Decide which downstream branch should be executed
-        based on bronze ingestion result.
+        Decide which downstream branch should be executed based on bronze ingestion result.
 
         Args:
             ti: Airflow task instance object.
@@ -85,17 +87,16 @@ class NbpCurrencyRates:
         return "No_data_available"
 
     @staticmethod
-    def transform_rates_to_silver_layer(logical_date=None, **kwargs) -> None:
+    def transform_rates_to_silver_layer(
+        logical_date: str | None = None,
+        **kwargs: str,
+    ) -> None:
         """
-        Read raw XML data from bronze layer, normalize currency rates
-        and store transformed dataset as Parquet in silver layer.
+        Transform raw XML currency rates into parquet dataset.
 
-        Transformation steps:
-        - parse XML structure,
-        - normalize decimal separators,
-        - cast columns to proper data types,
-        - calculate normalized exchange rate,
-        - serialize dataset into parquet format.
+        Read raw XML data from bronze layer, normalize currency rates,
+        cast columns to proper data types, calculate normalized exchange
+        rates, and store the transformed dataset in the silver layer.
 
         Args:
             logical_date: Airflow logical execution date.
@@ -110,12 +111,13 @@ class NbpCurrencyRates:
         searched_day = run_date[4:6]
         bucket_client = GoogleCloudStorageHandler()
         blob_name = f"{metadata['bronze_path']}year=20{searched_year}/month={searched_month}/day={searched_day}/table.xml"
-        logger.info(f"Searching for blob: {blob_name}")
+        logger.info("Searching for blob: %s", blob_name)
         xml_text = bucket_client.get_text_file_from_bucket(
-            bucket_name=metadata["destination_bucket"], path=blob_name
+            bucket_name=metadata["destination_bucket"],
+            path=blob_name,
         )
 
-        root = ET.fromstring(xml_text)
+        root = ElementTree.fromstring(xml_text)
         rates_list = []
 
         try:
@@ -128,12 +130,12 @@ class NbpCurrencyRates:
                         "kod_waluty": child.findtext("kod_waluty"),
                         "kurs_sredni": child.findtext("kurs_sredni"),
                         "data_publikacji": effective_date,
-                    }
+                    },
                 )
-        except ET.ParseError as e:
-            logger.error(f"Parsing error: {e}")
+        except ElementTree.ParseError:
+            logger.exception("Parsing error")
             raise
-        logger.info(f"Parsed xml into list")
+        logger.info("Parsed xml into list")
         logger.info("::group::")
         logger.info("\n".join(json.dumps(r, ensure_ascii=False) for r in rates_list))
         logger.info("::endgroup::")
@@ -147,5 +149,7 @@ class NbpCurrencyRates:
         df["effective_date"] = pd.to_datetime(df["effective_date"]).dt.date
         blob_name = f"{metadata['silver_path']}year=20{searched_year}/month={searched_month}/day={searched_day}/transformed.parquet"
         bucket_client.upload_to_bucket_from_parquet_file(
-            df=df, path=blob_name, bucket_name=metadata["destination_bucket"]
+            df=df,
+            path=blob_name,
+            bucket_name=metadata["destination_bucket"],
         )

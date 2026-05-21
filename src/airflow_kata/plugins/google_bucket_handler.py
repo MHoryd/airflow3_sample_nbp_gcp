@@ -1,14 +1,16 @@
-from google.cloud import storage
-from typing import Any
 import json
 import tempfile
+from typing import Any
+
 import pandas as pd
+from google.cloud import storage
 
 
 class GoogleCloudStorageHandler:
     """
-    Utility wrapper around Google Cloud Storage client used for
-    uploading and downloading project assets and datasets.
+    Utility wrapper around Google Cloud Storage client.
+
+    Used for uploading and downloading project assets and datasets.
     """
 
     def __init__(self) -> None:
@@ -26,7 +28,10 @@ class GoogleCloudStorageHandler:
         blob.upload_from_string(content, content_type=content_type)
 
     def upload_to_bucket_from_parquet_file(
-        self, df: pd.DataFrame, path: str, bucket_name: str
+        self,
+        df: pd.DataFrame,
+        path: str,
+        bucket_name: str,
     ) -> None:
         bucket = self.client.bucket(bucket_name)
         with tempfile.NamedTemporaryFile(suffix=".parquet", delete=True) as tmp:

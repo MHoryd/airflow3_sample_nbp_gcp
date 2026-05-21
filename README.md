@@ -44,7 +44,7 @@ The DAG requires a configuration bucket that stores metadata.
 Create a .env file:
 
 ```bash
-config_bucket=airflow_sample
+CONFIG_BUCKET=airflow_sample
 ```
 This bucket is used to load DAG configuration dynamically at runtime.
 

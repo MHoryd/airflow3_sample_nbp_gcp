@@ -12,7 +12,7 @@ services:
       PYTHONPATH: /opt/airflow/src
 
       GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/keys/gcp-key.json
-      config_bucket: ${config_bucket}
+      CONFIG_BUCKET: ${CONFIG_BUCKET}
 
     volumes:
       - ./dags:/opt/airflow/dags

@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 
 import pendulum
 from airflow.providers.standard.operators.empty import EmptyOperator
@@ -23,6 +24,12 @@ with DAG(
     schedule=metadata["schedule"],
     catchup=metadata.get("catchup", False),
     params={"metadata": metadata},
+    default_args={
+        "retries": metadata.get("default_retries", 3),
+        "retry_delay": timedelta(
+            minutes=metadata.get("default_retries_delay_in_minutes", 1),
+        ),
+    },
 ) as dag:
     Bronze_layer_ingestion = PythonOperator(
         task_id="Bronze_layer_ingestion",

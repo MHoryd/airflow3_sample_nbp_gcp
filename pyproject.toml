@@ -12,6 +12,7 @@ dependencies = [
     "httpx>=0.28.1",
     "pandas>=2.2.0",
     "pendulum>=3.0.0",
+    "pytest>=9.0.3",
 ]
 
 [tool.setuptools]
@@ -19,3 +20,34 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+exclude = [
+    ".git",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "__pycache__",
+]
+
+[tool.ruff.lint]
+# Enable the most useful sets of rules:
+# "E"  - pycodestyle errors (spacing, syntax)
+# "F"  - pyflakes (unused variables like the F841 you saw, missing imports)
+# "I"  - isort (automatically sorts your imports alphabetically and by type)
+# "UP" - pyupgrade (suggests modern Python syntax, perfect for 3.12)
+# "B"  - flake8-bugbear (finds common bugs and design problems)
+select = ["E", "F", "I", "UP", "B"]
+
+ignore = []
+
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.format]
+# Keep formatting consistent with Black
+quote-style = "double"
+indent-style = "space"

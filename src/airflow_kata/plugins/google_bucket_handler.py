@@ -25,7 +25,7 @@ class GoogleCloudStorageHandler:
     ) -> None:
         bucket = self.client.bucket(bucket_name)
         blob = bucket.blob(path)
-        blob.upload_from_string(content, content_type=content_type)
+        blob.upload_from_string(data=content, content_type=content_type)
 
     def upload_to_bucket_from_parquet_file(
         self,
@@ -45,7 +45,7 @@ class GoogleCloudStorageHandler:
         blob = bucket.get_blob(path)
         return json.loads(blob.download_as_string())
 
-    def get_text_file_from_bucket(self, path: str, bucket_name: str) -> dict[str, Any]:
+    def get_text_file_from_bucket(self, path: str, bucket_name: str) -> str:
         bucket = self.client.get_bucket(bucket_name)
         blob = bucket.get_blob(path)
         return blob.download_as_string().decode("utf-8")

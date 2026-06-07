@@ -7,7 +7,7 @@ import pandas as pd
 import pendulum
 from airflow.models.taskinstance import TaskInstance
 from airflow.sdk import get_current_context
-from defusedxml import ElementTree
+from transformations.nbp_xml_parser import parse_nbp_xml_to_records
 
 from airflow_kata.plugins.google_bucket_handler import GoogleCloudStorageHandler
 
@@ -16,7 +16,10 @@ class NbpCurrencyRates:
     """Collection of ETL operations responsible for processing NBP currency exchange rates data."""
 
     @staticmethod
-    def get_rates_and_store_in_bronze(logical_date: datetime) -> bool:
+    def get_rates_and_store_in_bronze(
+        logical_date: datetime,
+        bucket_client: GoogleCloudStorageHandler | None = None,
+    ) -> bool:
         """
         Download NBP exchange rates XML file for Airflow logical date and store raw payload in bronze layer.
 
@@ -31,6 +34,7 @@ class NbpCurrencyRates:
             True if data for requested date exists, otherwise False.
 
         """
+        bucket_client = None or GoogleCloudStorageHandler()
         logger = logging.getLogger(__name__)
         context = get_current_context()
         metadata = context["metadata"]
@@ -55,7 +59,6 @@ class NbpCurrencyRates:
             )
             request_for_target_rates.raise_for_status()
             now = pendulum.from_format(run_date, "YYMMDD")
-            bucket_client = GoogleCloudStorageHandler()
             blob_path = f"{metadata['bronze_path']}year={now.year}/month={now.month:02d}/day={now.day:02d}/table.xml"
             bucket_client.upload_to_bucket_from_string(
                 content=request_for_target_rates.content.decode("windows-1250"),
@@ -89,6 +92,7 @@ class NbpCurrencyRates:
     @staticmethod
     def transform_rates_to_silver_layer(
         logical_date: str | None = None,
+        bucket_client: GoogleCloudStorageHandler | None = None,
         **kwargs: str,
     ) -> None:
         """
@@ -117,28 +121,7 @@ class NbpCurrencyRates:
             path=blob_name,
         )
 
-        root = ElementTree.fromstring(xml_text)
-        rates_list = []
-
-        try:
-            effective_date = root.findtext("data_publikacji")
-            for child in root.findall("pozycja"):
-                rates_list.append(
-                    {
-                        "nazwa_waluty": child.findtext("nazwa_waluty"),
-                        "przelicznik": child.findtext("przelicznik"),
-                        "kod_waluty": child.findtext("kod_waluty"),
-                        "kurs_sredni": child.findtext("kurs_sredni"),
-                        "data_publikacji": effective_date,
-                    },
-                )
-        except ElementTree.ParseError:
-            logger.exception("Parsing error")
-            raise
-        logger.info("Parsed xml into list")
-        logger.info("::group::")
-        logger.info("\n".join(json.dumps(r, ensure_ascii=False) for r in rates_list))
-        logger.info("::endgroup::")
+        rates_list = parse_nbp_xml_to_records(xml_text=xml_text)
         df = pd.DataFrame.from_records(rates_list).rename(
             columns=metadata["column_rename_pattern"],
         )
